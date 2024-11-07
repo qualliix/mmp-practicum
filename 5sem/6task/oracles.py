@@ -45,7 +45,11 @@ class BinaryLogistic(BaseSmoothOracle):
 
         w - одномерный numpy array
         """
-        return (np.sum(np.logaddexp(0, -y * (X @ w)))/X.shape[0]
+        if isinstance(X, sc.sparse.csr_matrix):
+            matrix = np.array(X.todense())
+        else:
+            matrix = X
+        return (np.sum(np.logaddexp(0, -y * (matrix @ w)))/X.shape[0]
                 + (self.l2_coef/2) * np.dot(w, w))
         return super().func(w)
 
@@ -59,19 +63,13 @@ class BinaryLogistic(BaseSmoothOracle):
 
         w - одномерный numpy array
         """
-        vec = (X @ w) * y
-        dot = np.dot((-y)*sc.special.expit(vec) * np.exp(-vec), X)
-        return (dot/ X.shape[0]
+        
+        if isinstance(X, sc.sparse.csr_matrix):
+            matrix = np.array(X.todense())
+        else:
+            matrix = X
+        vec = (matrix @ w) * y
+        return (np.dot((-y)*sc.special.expit(vec) * np.exp(-vec), matrix)
+                / X.shape[0]
                 + self.l2_coef * w)
         return super().grad(w)
-np.random.seed(1693)
-l2_coef = np.random.randint(0, 10)
-l, d = 1000, 10
-my_oracle = BinaryLogistic(l2_coef=l2_coef)
-X = np.random.random((l, d))
-y = np.random.randint(0, 2, l) * 2 - 1
-w = np.random.random(d)
-print(X.shape, y.shape, w.shape)
-res_grad = my_oracle.grad(X, y, w)
-res = " ".join([str(x) for x in res_grad])
-print(res)

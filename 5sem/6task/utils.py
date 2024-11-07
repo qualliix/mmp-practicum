@@ -10,8 +10,8 @@ def grad_finite_diff(X, y, w, eps=1e-8, l2_coef=0):
                           >> i <<
     """
     bl = oracles.BinaryLogistic(l2_coef=l2_coef)
-    I = np.eye(w.shape[0])
-    result = np.zeros(w.shape[0])
-    for i in range(w.shape[0]):
-        result[i] = (bl.func(X, y, w + eps * I[i]) - bl.func(X, y, w)) / eps
-    return result
+    e = np.zeros(w.shape[0])
+    e[0] = 1
+    result = np.arange(w.shape[0])
+    grad = np.vectorize(lambda r: (bl.func(X, y, w + eps * np.roll(e, r)) - bl.func(X, y, w)) / eps)
+    return grad(result)
