@@ -27,7 +27,7 @@ class BinaryLogistic(BaseSmoothOracle):
     Оракул должен поддерживать l2 регуляризацию.
     """
 
-    def __init__(self, l2_coef=0):
+    def __init__(self, l2_coef=1):
         """
         Задание параметров оракула.
 
@@ -45,11 +45,7 @@ class BinaryLogistic(BaseSmoothOracle):
 
         w - одномерный numpy array
         """
-        if isinstance(X, sc.sparse.csr_matrix):
-            matrix = np.array(X.todense())
-        else:
-            matrix = X
-        return (np.sum(np.logaddexp(0, -y * (matrix @ w)))/X.shape[0]
+        return (np.sum(np.logaddexp(0, -y * (X @ w)))/X.shape[0]
                 + (self.l2_coef/2) * np.dot(w, w))
         return super().func(w)
 
@@ -64,12 +60,8 @@ class BinaryLogistic(BaseSmoothOracle):
         w - одномерный numpy array
         """
         
-        if isinstance(X, sc.sparse.csr_matrix):
-            matrix = np.array(X.todense())
-        else:
-            matrix = X
-        vec = (matrix @ w) * y
-        return (np.dot((-y)*sc.special.expit(vec) * np.exp(-vec), matrix)
+        vec = (X @ w) * y
+        return (np.dot((-y)*sc.special.expit(vec) * np.exp(-vec), X)
                 / X.shape[0]
                 + self.l2_coef * w)
         return super().grad(w)

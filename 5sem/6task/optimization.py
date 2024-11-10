@@ -2,7 +2,7 @@ from oracles import BinaryLogistic
 import time
 import numpy as np
 import scipy as sc
-
+from sklearn.utils import shuffle
 
 class GDClassifier:
     """
@@ -11,7 +11,7 @@ class GDClassifier:
     """
 
     def __init__(
-        self, loss_function, step_alpha=1, step_beta=0,
+        self, loss_function="binary", step_alpha=1, step_beta=0,
         tolerance=1e-5, max_iter=1000, **kwargs
     ):
         """
@@ -57,19 +57,31 @@ class GDClassifier:
         (0 для самой первой точки)
         """
         self.w = w_0
-        self.history = {"time": [0], "func": [self.get_objective(X, y)]}
-        for k in range(self.max_iter):
-            s = time.time()
-            grad = self.get_gradient(X, y)
-            eta = self.step_alpha / k**self.step_beta
-            self.w = self.w - eta*grad
-            f = self.get_objective(X, y)
-            self.history["time"].append(time.time() - s)
-            self.history["func"].append(f)
-            if abs(self.history["func"][-2] - f) < self.tolerance:
-                break
         if trace:
+            self.history = {"time": [0], "func": [self.get_objective(X, y)], "accuracy": [
+                self.accuracy(X, y)]}
+            for k in range(1, self.max_iter+1):
+                s = time.time()
+                grad = self.get_gradient(X, y)
+                eta = self.step_alpha / (k**self.step_beta)
+                self.w = self.w - eta*grad
+                f = self.get_objective(X, y)
+                self.history["time"].append(time.time() - s)
+                self.history["func"].append(f)
+                self.history["accuracy"].append(self.accuracy(X, y))
+                if abs(self.history["func"][-2] - f) < self.tolerance:
+                    break
             return self.history
+        else:
+            f = self.get_objective(X, y)
+            for k in range(1, self.max_iter+1):
+                last_f = f
+                grad = self.get_gradient(X, y)
+                eta = self.step_alpha / k**self.step_beta
+                self.w = self.w - eta*grad
+                f = self.get_objective(X, y)
+                if abs(last_f - f) < self.tolerance:
+                    break
 
     def predict(self, X):
         """
@@ -120,6 +132,9 @@ class GDClassifier:
         Получение значения весов функционала
         """
         return self.w
+
+    def accuracy(self, X, y):
+        return np.mean(self.predict(X) == y)
 
 
 class SGDClassifier(GDClassifier):
@@ -191,26 +206,28 @@ class SGDClassifier(GDClassifier):
         """
         self.w = w_0
         self.history = {"time": [0], "func": [self.get_objective(X, y)], "weights_diff": [
-            0], "epoch_num": [0]}
+            0], "epoch_num": [0], "accuracy": [self.accuracy(X, y)]}
         count = 0
-        lenght = len(X)
+        lenght = X.shape[0]
         np.random.seed(self.random_seed)
-        for k in range(self.max_iter):
+        for k in range(1, self.max_iter):
             s = time.time()
+            Xs, ys = shuffle(X, y, random_state=self.random_seed)
             for i in range(0, lenght, self.batch_size):
                 grad = self.get_gradient(
-                    X[i:i+self.batch_size], y[i:i+self.batch_size])
+                    X[i:i+self.batch_size], ys[i:i+self.batch_size])
                 eta = self.step_alpha / k**self.step_beta
                 prev_w = self.w
                 self.w = self.w - eta*grad
                 count += self.batch_size
                 epoch_num = count / lenght
-                if (epoch_num - self.history["epoch_num"][-1]) < log_freq:
+                if (epoch_num - self.history["epoch_num"][-1]) > log_freq:
                     f = self.get_objective(
-                        X[i:i+self.batch_size], y[i:i+self.batch_size])
+                        Xs[i:i+self.batch_size], ys[i:i+self.batch_size])
                     self.history["time"].append(time.time() - s)
                     self.history["func"].append(f)
                     self.history["epoch_num"].append(epoch_num)
+                    self.history["accuracy"].append(self.accuracy(X, y))
                     self.history["weights_diff"].append(
                         (prev_w - self.w) @ (prev_w - self.w))
                     if abs(self.history["func"][-2] - f) < self.tolerance:
@@ -220,7 +237,7 @@ class SGDClassifier(GDClassifier):
 # np.random.seed(10)
 # clf = SGDClassifier(loss_function='binary_logistic', step_alpha=1,
 #     step_beta=0, tolerance=1e-4, batch_size=100,  max_iter=6, l2_coef=0.1)
-# l, d = 1000, 10
+# l, d = 1000, 10 
 # X = np.random.random((l, d))
 # y = np.random.randint(0, 2, l) * 2 - 1
 # w = np.random.random(d)
